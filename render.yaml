@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: betsync-backend
+    env: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server-postgres.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_USER
+        value: postgres
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 5432
+      - key: DB_NAME
+        value: postgres
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: static_site
+    name: betsync-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    routes:
+      - path: /
+        destination: /index.html
+      - path: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://betsync-backend.onrender.com

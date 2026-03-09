@@ -1,0 +1,22 @@
+{
+  "name": "betsync",
+  "version": "2.0.0",
+  "description": "Sistema de Gerenciamento de Apostas Esportivas com PostgreSQL e Autenticação",
+  "main": "backend/server-postgres.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd backend && node server-postgres.js",
+    "start:backend": "cd backend && node server-postgres.js",
+    "start:frontend": "cd frontend && npm start",
+    "install-deps": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["apostas", "betting", "sports", "gerenciamento", "dashboard"],
+  "author": "Manus AI",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
