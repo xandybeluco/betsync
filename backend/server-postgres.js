@@ -15,71 +15,124 @@ const dashboardRoutes = require('./routes/dashboard');
 const calculatorsRoutes = require('./routes/calculators');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
+// =======================
+// MIDDLEWARE
+// =======================
+
 app.use(helmet());
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || '*',
   credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint (no auth required)
+// =======================
+// HEALTHCHECK
+// =======================
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({
+    status: 'ok',
+    service: 'betsync-api',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Auth routes (no auth required)
+// Root route (útil para teste no navegador)
+app.get('/', (req, res) => {
+  res.send('BetSync API running 🚀');
+});
+
+// =======================
+// ROUTES
+// =======================
+
+// Public routes
 app.use('/api/auth', authRoutes);
 
-// Protected routes (auth required)
+// Protected routes
 app.use('/api/bets', authMiddleware, betsRoutes);
 app.use('/api/bookmakers', authMiddleware, bookmakersRoutes);
 app.use('/api/operations', authMiddleware, operationsRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/calculators', authMiddleware, calculatorsRoutes);
 
-// Error handling middleware
+// =======================
+// ERROR HANDLING
+// =======================
+
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error'
   });
 });
 
-// 404 handler
+// 404
 app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+  res.status(404).json({
+    error: 'Endpoint not found'
+  });
 });
 
-// Initialize database and start server
+// =======================
+// SERVER START
+// =======================
+
 const startServer = async () => {
+
+  console.log('🚀 Starting BetSync server...');
+
+  // Start server FIRST (important for Railway)
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+  });
+
+  // Initialize database after server start
   try {
-    console.log('🚀 Starting BetSync server with PostgreSQL...');
-    
-    // Initialize database
+
+    console.log('📦 Connecting to PostgreSQL...');
+
     await initializeDatabase();
-    
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
-      console.log(`📍 API available at http://localhost:${PORT}/api`);
-      console.log(`🔐 Demo credentials: email=demo@betsync.com, password=demo123`);
-    });
+
+    console.log('✅ PostgreSQL connected');
+
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
+
+    console.error('❌ Database connection failed:', error);
+
   }
 };
 
-// Handle graceful shutdown
+// =======================
+// GRACEFUL SHUTDOWN
+// =======================
+
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  const { close } = require('./database/postgres');
-  await close();
+
+  console.log('\n🛑 Shutting down server...');
+
+  try {
+
+    const { close } = require('./database/postgres');
+    await close();
+
+    console.log('✅ Database connection closed');
+
+  } catch (error) {
+
+    console.error('Error closing database:', error);
+
+  }
+
   process.exit(0);
+
 });
 
 startServer();
