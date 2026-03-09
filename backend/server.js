@@ -1,3 +1,5 @@
+const initializeDatabase = require('./database/postgres-init');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,75 +9,100 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy when behind reverse proxy (e.g. React dev server forwarding)
-if (process.env.NODE_ENV !== 'production') {
-  app.set('trust proxy', 1);
-}
+// Trust proxy (necessário no Railway)
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : ['http://localhost:3000'],
+  origin: '*',
   credentials: true
 }));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.'
 });
+
 app.use('/api/', limiter);
 
-// Body parsing middleware
+// Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// API routes
+// =====================
+// API ROUTES
+// =====================
+
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/bets', require('./routes/bets'));
 app.use('/api/operations', require('./routes/operations'));
 app.use('/api/bookmakers', require('./routes/bookmakers'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/calculators', require('./routes/calculators'));
 
-// Health check endpoint
+// =====================
+// HEALTH CHECK
+// =====================
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'betsync-api',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Error handling middleware
+// =====================
+// ERROR HANDLER
+// =====================
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!', 
-    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
+
+  res.status(500).json({
+    error: 'Something went wrong',
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message
   });
 });
 
-// 404 handler
+// =====================
+// 404 HANDLER
+// =====================
+
 app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-// Initialize database and start server
-const db = require('./database/connection');
-const { createTables, migrateBetsTable, insertDefaultBookmakers, insertDefaultSettings } = require('./database/init');
-
-db.serialize(() => {
-  console.log('Database connected successfully');
-  createTables();
-  migrateBetsTable(() => {
-    insertDefaultBookmakers();
-    insertDefaultSettings();
-    setImmediate(() => {
-      app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      });
-    });
+  res.status(404).json({
+    error: 'Endpoint not found'
   });
 });
+
+// =====================
+// START SERVER
+// =====================
+
+const startServer = async () => {
+  try {
+
+    await initializeDatabase();
+
+    app.listen(PORT, () => {
+      console.log('🚀 BetSync API running');
+      console.log(`🌍 Port: ${PORT}`);
+      console.log(`⚙️ Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server');
+    console.error(error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;
